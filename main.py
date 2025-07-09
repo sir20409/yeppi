@@ -1,84 +1,70 @@
 import streamlit as st
-import geocoder
-import pytz
-from datetime import datetime
-from pysolar.solar import get_altitude, get_azimuth
-import osmnx as ox
-import networkx as nx
-import folium
-from streamlit_folium import st_folium
-import math
 
-st.title("🌳 햇빛 회피 경로 시뮬레이터")
+# 진법 변환을 위한 함수
+def base_n_to_decimal(num_str, base):
+    return int(num_str, base)
 
-# 1. 사용자 위치 & 현재 시간 (한국시간)
-g = geocoder.ip('me')
-lat, lon = (g.latlng if g.latlng else (37.5665, 126.9780))
-kst = pytz.timezone("Asia/Seoul")
-now_naive = datetime.now()  # naive datetime
-now = kst.localize(now_naive)  # timezone-aware
-dt_utc = now.astimezone(pytz.utc)
+def decimal_to_base_n(num, base):
+    if num == 0:
+        return "0"
+    digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    result = ""
+    while num > 0:
+        result = digits[num % base] + result
+        num //=base
+    return result
 
-# 2. 출발지, 도착지 입력 (위도,경도)
-orig = st.text_input("출발지 (lat,lon)", f"{lat:.5f},{lon:.5f}")
-dest = st.text_input("도착지 (lat,lon)", f"{lat+0.01:.5f},{lon+0.01:.5f}")
+st.title("진법 변환 및 시각화 도구")
 
-try:
-    lat1, lon1 = map(float, orig.split(","))
-    lat2, lon2 = map(float, dest.split(","))
-except Exception as e:
-    st.error("위도, 경도 입력 형식이 잘못되었습니다. 예: 37.5665,126.9780")
-    st.stop()
+st.write("진법을 이해하기 어려운 학생들을 위한 시각적 도구입니다.")
 
-# 3. 도로망 bbox 기준 불러오기 (north, south, east, west 순서)
-north = max(lat1, lat2) + 0.005
-south = min(lat1, lat2) - 0.005
-east = max(lon1, lon2) + 0.005
-west = min(lon1, lon2) - 0.005
+# 진법 선택
+base = st.slider("몇 진법으로 할까요?", min_value=2, max_value=36, value=10)
 
-G = ox.graph_from_bbox(north, south, east, west, network_type='walk')
+st.write(f"선택된 진법: {base}진법")
 
-# 4. 태양 고도 및 방위각 계산 (사용자 현재 위치 기준)
-alt = get_altitude(lat, lon, dt_utc)
-azi = get_azimuth(lat, lon, dt_utc)
+# 입력 모드 선택: 1) 십진법 입력 2) 선택한 진법 입력
+mode = st.radio("입력 모드 선택", ("십진법 숫자 입력", f"{base}진법 숫자 입력"))
 
-# 5. 엣지 비용 함수 (길이 + 그림자 효과)
-def edge_sun_cost(u, v, data):
-    length = data.get('length', 1)
-    if alt <= 0:
-        return length  # 태양 안 뜨면 그냥 길이 비용
-    # tan(alt)가 0이면 너무 커질 수 있으니 최소값 처리
-    tan_alt = math.tan(math.radians(alt))
-    if tan_alt < 0.01:
-        tan_alt = 0.01
-    shadow_cost = length / tan_alt
-    return length + shadow_cost
+if mode == "십진법 숫자 입력":
+    dec_val = st.number_input("십진법 숫자 입력", min_value=0, step=1)
+    # 십진법 -> 선택한 진법
+    base_val = decimal_to_base_n(dec_val, base)
+    st.write(f"{dec_val} (10진법) = {base_val} ({base}진법)")
 
-# 6. 엣지별 비용 설정
-edge_weights = {}
-for u, v, key, data in G.edges(keys=True, data=True):
-    edge_weights[(u, v, key)] = edge_sun_cost(u, v, data)
-nx.set_edge_attributes(G, edge_weights, 'weight')
+elif mode == f"{base}진법 숫자 입력":
+    base_val = st.text_input(f"{base}진법 숫자 입력 (0-9, A-Z 사용)")
+    if base_val:
+        try:
+            dec_val = base_n_to_decimal(base_val.upper(), base)
+            st.write(f"{base_val} ({base}진법) = {dec_val} (10진법)")
+        except ValueError:
+            st.error(f"잘못된 {base}진법 숫자입니다.")
 
-# 7. 출발지, 도착지에 가장 가까운 노드 찾기
-orig_node = ox.distance.nearest_nodes(G, lon1, lat1)
-dest_node = ox.distance.nearest_nodes(G, lon2, lat2)
+# 추가: 주요 진법별 변환값 표 보여주기
+st.markdown("---")
+st.subheader("다른 주요 진법별 변환 예시")
 
-# 8. 최단 경로 계산 (가중치 'weight' 기준)
-try:
-    route = nx.shortest_path(G, orig_node, dest_node, weight='weight')
-except nx.NetworkXNoPath:
-    st.error("출발지와 도착지 사이에 경로를 찾을 수 없습니다.")
-    st.stop()
+if mode == "십진법 숫자 입력":
+    dec_val = int(dec_val)
+elif mode == f"{base}진법 숫자 입력" and base_val:
+    try:
+        dec_val = base_n_to_decimal(base_val.upper(), base)
+    except:
+        dec_val = None
+else:
+    dec_val = None
 
-# 9. 지도 생성 및 경로 표시
-m = folium.Map(location=[lat, lon], zoom_start=15)
-folium.Marker([lat1, lon1], tooltip="출발").add_to(m)
-folium.Marker([lat2, lon2], tooltip="도착").add_to(m)
+if dec_val is not None:
+    bases = [2, 8, 10, 16]
+    if base not in bases:
+        bases.append(base)
+    bases = sorted(list(set(bases)))
 
-route_coords = [(G.nodes[n]['y'], G.nodes[n]['x']) for n in route]
-folium.PolyLine(route_coords, color='green', weight=5, tooltip="그림자 우선 경로").add_to(m)
+    data = []
+    for b in bases:
+        val = decimal_to_base_n(dec_val, b)
+        data.append((f"{b}진법", val))
+    st.table(data)
 
-st.write(f"🌥️ 태양 고도: {alt:.1f}°, 방위각: {azi:.1f}°")
-st_folium(m, width=700, height=500)
 
