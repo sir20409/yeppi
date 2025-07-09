@@ -1,53 +1,57 @@
-# shadow_simulator.py
 import streamlit as st
+import geocoder, pytz
 from datetime import datetime
-import pytz
 from pysolar.solar import get_altitude, get_azimuth
+import osmnx as ox
+import networkx as nx
 import folium
 from streamlit_folium import st_folium
 import math
 
-st.title("태양 위치 & 그림자 시뮬레이터")
+st.title("🌳 햇빛 회피 경로 시뮬레이터")
 
-# 사용자 입력
-latitude = st.number_input("위도 (예: 37.5665)", value=37.5665)
-longitude = st.number_input("경도 (예: 126.9780)", value=126.9780)
-date_input = st.date_input("날짜", datetime.now().date())
-time_input = st.time_input("시간", datetime.now().time())
-building_height = st.number_input("건물 높이 (미터)", value=10.0)
+# 사용자 위치 & 시간
+g = geocoder.ip('me')
+lat, lon = (g.latlng if g.latlng else (37.5665,126.9780))
+kst = pytz.timezone("Asia/Seoul")
+now = datetime.now(kst)
+dt_utc = kst.localize(now).astimezone(pytz.utc)
 
-# 시각 계산
-local_tz = pytz.timezone("Asia/Seoul")
-dt_local = local_tz.localize(datetime.combine(date_input, time_input))
-dt_utc = dt_local.astimezone(pytz.utc)
+# 출발 · 도착 입력
+orig = st.text_input("출발지 (lat,lon)", f"{lat:.5f},{lon:.5f}")
+dest = st.text_input("도착지 (lat,lon)", f"{lat+0.01:.5f},{lon+0.01:.5f}")
+lat1, lon1 = map(float, orig.split(","))
+lat2, lon2 = map(float, dest.split(","))
 
-# 태양 고도 및 방위각 계산
-altitude = get_altitude(latitude, longitude, dt_utc)
-azimuth = get_azimuth(latitude, longitude, dt_utc)
+# 도로망 로딩
+G = ox.graph_from_bbox(min(lat1,lat2)-0.005, max(lat1,lat2)+0.005,
+                       min(lon1,lon2)-0.005, max(lon1,lon2)+0.005, network_type='walk')
 
-st.write(f"🌞 태양 고도: {altitude:.2f}°")
-st.write(f"🧭 태양 방위각: {azimuth:.2f}°")
+# 태양 고도/방위각 계산
+alt = get_altitude(lat, lon, dt_utc)
+azi = get_azimuth(lat, lon, dt_utc)
 
-# 그림자 길이 및 방향 계산
-if altitude > 0:
-    shadow_length = building_height / math.tan(math.radians(altitude))
-    st.write(f"🕶️ 그림자 길이: {shadow_length:.2f} 미터")
+# 비용 함수: 그림자가 많을수록 낮은 비용
+def edge_sun_cost(u, v, data):
+    mid_lat = (G.nodes[u]['y']+G.nodes[v]['y'])/2
+    mid_lon = (G.nodes[u]['x']+G.nodes[v]['x'])/2
+    if alt <= 0:
+        return data.get('length',1)
+    shadow = data.get('length',1)/math.tan(math.radians(alt))
+    return data.get('length',1) + shadow
 
-    # 위도/경도 기준 그림자 위치 계산 (단순화)
-    def offset_coordinates(lat, lon, distance_m, azimuth_deg):
-        # 거리(m)와 방위각을 위도, 경도로 변환
-        delta_lat = distance_m * math.cos(math.radians(azimuth_deg)) / 111_000
-        delta_lon = distance_m * math.sin(math.radians(azimuth_deg)) / (111_000 * math.cos(math.radians(lat)))
-        return lat + delta_lat, lon + delta_lon
+nx.set_edge_attributes(G, {edge: edge_sun_cost(*edge, data) for edge, data in G.edges.items()}, 'weight')
 
-    shadow_lat, shadow_lon = offset_coordinates(latitude, longitude, shadow_length, azimuth + 180)  # 반대 방향
+# 최단경로 (그림자 비용 기준) 계산
+orig_node = ox.distance.nearest_nodes(G, lon1, lat1)
+dest_node = ox.distance.nearest_nodes(G, lon2, lat2)
+route = nx.shortest_path(G, orig_node, dest_node, weight='weight')
 
-    # 지도 생성 및 마커
-    m = folium.Map(location=[latitude, longitude], zoom_start=18)
-    folium.Marker([latitude, longitude], tooltip="건물 위치").add_to(m)
-    folium.PolyLine(locations=[[latitude, longitude], [shadow_lat, shadow_lon]],
-                    color="gray", weight=4, tooltip="그림자").add_to(m)
-    st_folium(m, width=700, height=500)
-else:
-    st.warning("태양이 지평선 아래에 있습니다. (고도 음수)")
-
+# 지도 시각화
+m = folium.Map(location=[lat, lon], zoom_start=15)
+folium.Marker([lat1, lon1], tooltip="출발").add_to(m)
+folium.Marker([lat2, lon2], tooltip="도착").add_to(m)
+coords = [(G.nodes[n]['y'], G.nodes[n]['x']) for n in route]
+folium.PolyLine(coords, color="green", weight=5, tooltip="그림자 우선 경로").add_to(m)
+st.write(f"🌥️ 태양 고도: {alt:.1f}°, 방위각: {azi:.1f}°")
+st_folium(m, width=700, height=500)
