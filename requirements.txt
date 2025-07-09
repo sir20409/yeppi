@@ -1,0 +1,1 @@
+pip install streamlit pysolar folium streamlit-folium pytz
