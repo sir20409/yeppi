@@ -15,7 +15,7 @@ g = geocoder.ip('me')
 lat, lon = (g.latlng if g.latlng else (37.5665,126.9780))
 kst = pytz.timezone("Asia/Seoul")
 now = datetime.now(kst)
-dt_utc = kst.localize(now).astimezone(pytz.utc)
+dt_utc = now.astimezone(pytz.utc)
 
 # 출발 · 도착 입력
 orig = st.text_input("출발지 (lat,lon)", f"{lat:.5f},{lon:.5f}")
