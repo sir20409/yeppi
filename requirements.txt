@@ -1,1 +1,9 @@
-pip install streamlit geocoder pysolar folium streamlit-folium osmnx networkx
+pip 
+install 
+streamlit 
+geocoder 
+pysolar 
+folium 
+streamlit-folium
+osmnx 
+networkx
