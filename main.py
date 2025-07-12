@@ -46,7 +46,7 @@ if "TSP" in algorithm:
     start_index = int(start_node[1:])
 
 # -----------------------------
-# 그래프 생성 함수
+# 그래프 구성 함수
 # -----------------------------
 def make_symmetric_matrix(matrix):
     n = len(matrix)
@@ -75,6 +75,16 @@ def parse_matrix(matrix, symmetric=True):
                 continue
     return G
 
+def is_graph_valid_for_tsp(G):
+    try:
+        return (
+            G.number_of_nodes() >= 2 and
+            G.number_of_edges() >= 1 and
+            nx.is_connected(G)
+        )
+    except:
+        return False
+
 matrix_values = weight_matrix.values.tolist()
 if symmetric_toggle:
     matrix_values = make_symmetric_matrix(matrix_values)
@@ -82,7 +92,7 @@ if symmetric_toggle:
 G = parse_matrix(matrix_values, symmetric=symmetric_toggle)
 
 # -----------------------------
-# 시각화 함수 (에러 수정 포함)
+# 시각화 함수
 # -----------------------------
 def draw_graph(graph, highlight_edges=None, title="그래프"):
     pos = nx.spring_layout(graph, seed=42)
@@ -137,12 +147,15 @@ if st.button("🚀 알고리즘 실행"):
 
         elif "TSP" in algorithm:
             st.subheader("🧭 모든 노드 순회 (TSP)")
-            try:
-                path = traveling_salesman_problem(G, cycle=True, weight="weight", nodes=[start_index])
-                tsp_edges = list(zip(path[:-1], path[1:]))
-                total_cost = sum(G[u][v]['weight'] for u, v in tsp_edges)
-                st.write("방문 순서:", " → ".join([f"N{n}" for n in path]))
-                st.write("총 거리:", total_cost)
-                draw_graph(G, highlight_edges=tsp_edges)
-            except Exception as e:
-                st.error(f"TSP 계산 중 오류 발생: {e}")
+            if not is_graph_valid_for_tsp(G):
+                st.warning("⚠️ 최소 2개 이상의 노드가 연결되어 있어야 TSP를 계산할 수 있습니다.")
+            else:
+                try:
+                    path = traveling_salesman_problem(G, cycle=True, weight="weight", nodes=[start_index])
+                    tsp_edges = list(zip(path[:-1], path[1:]))
+                    total_cost = sum(G[u][v]['weight'] for u, v in tsp_edges)
+                    st.write("방문 순서:", " → ".join([f"N{n}" for n in path]))
+                    st.write("총 거리:", total_cost)
+                    draw_graph(G, highlight_edges=tsp_edges)
+                except Exception as e:
+                    st.error(f"TSP 계산 중 오류 발생: {e}")
