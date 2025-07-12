@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from networkx.algorithms.approximation import traveling_salesman_problem
+
 # -----------------------------
 # 기본 설정
 # -----------------------------
@@ -13,7 +15,7 @@ st.title("📊 그래프 알고리즘 시각화 도구")
 # -----------------------------
 # 입력: 노드 수 및 가중치 행렬
 # -----------------------------
-node_count = st.number_input("노드 수 입력", min_value=2, max_value=20, value=4)
+node_count = st.number_input("노드 수 입력", min_value=2, max_value=12, value=4)
 
 symmetric_toggle = st.checkbox("🔁 양방향 간선 가중치 자동 대칭 처리", value=True)
 
@@ -35,16 +37,16 @@ algorithm = st.selectbox(
     [
         "🛠️ 확장형 연결 방식 (Prim)",
         "🪢 묶음 연결 방식 (Kruskal)",
-        "🚶 최단 경로 찾기 (Dijkstra)"
+        "🧭 모든 노드 순회 (TSP)"
     ]
 )
 
-if "Dijkstra" in algorithm:
+if "TSP" in algorithm:
     start_node = st.selectbox("🚩 시작 노드를 선택하세요", [f"N{i}" for i in range(node_count)])
     start_index = int(start_node[1:])
 
 # -----------------------------
-# 그래프 구성 함수
+# 그래프 생성 함수
 # -----------------------------
 def make_symmetric_matrix(matrix):
     n = len(matrix)
@@ -131,18 +133,14 @@ if st.button("🚀 알고리즘 실행"):
             st.write("총 가중치:", mst.size(weight="weight"))
             st.write("연결된 간선:", list(mst.edges(data=True)))
 
-        elif "Dijkstra" in algorithm:
-            st.subheader("🚶 최단 경로 찾기 (Dijkstra)")
+        elif "TSP" in algorithm:
+            st.subheader("🧭 모든 노드 순회 (TSP)")
             try:
-                lengths, paths = nx.single_source_dijkstra(G, source=start_index)
-                for target in sorted(paths.keys()):
-                    if target == start_index:
-                        continue
-                    path_nodes = paths[target]
-                    path_edges = list(zip(path_nodes[:-1], path_nodes[1:]))
-                    st.markdown(f"**경로 {start_node} → N{target}**")
-                    st.write("총 거리:", lengths[target])
-                    st.write("경로:", " → ".join([f"N{n}" for n in path_nodes]))
-                    draw_graph(G, highlight_edges=path_edges)
-            except nx.NetworkXNoPath:
-                st.warning("🚫 해당 노드까지의 경로가 존재하지 않습니다.")
+                path = traveling_salesman_problem(G, cycle=True, weight="weight", nodes=[start_index])
+                tsp_edges = list(zip(path[:-1], path[1:]))
+                total_cost = sum(G[u][v]['weight'] for u, v in tsp_edges)
+                st.write("방문 순서:", " → ".join([f"N{n}" for n in path]))
+                st.write("총 거리:", total_cost)
+                draw_graph(G, highlight_edges=tsp_edges)
+            except Exception as e:
+                st.error(f"TSP 계산 중 오류 발생: {e}")
