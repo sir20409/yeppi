@@ -118,6 +118,8 @@ else:
 if st.button("🚀 알고리즘 실행"):
     if G.number_of_edges() == 0:
         st.warning("⚠️ 간선이 없습니다.")
+    elif not nx.is_connected(G):
+        st.warning("⚠️ 그래프가 연결되어 있지 않습니다. 모든 노드가 연결되도록 간선을 입력하세요.")
     else:
         if "Prim" in algorithm:
             st.subheader("🛠️ 확장형 연결 방식 (Prim)")
