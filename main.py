@@ -44,7 +44,7 @@ if "Dijkstra" in algorithm:
     start_index = int(start_node[1:])
 
 # -----------------------------
-# 그래프 구성
+# 그래프 구성 함수
 # -----------------------------
 def make_symmetric_matrix(matrix):
     n = len(matrix)
@@ -80,16 +80,16 @@ if symmetric_toggle:
 G = parse_matrix(matrix_values, symmetric=symmetric_toggle)
 
 # -----------------------------
-# 그래프 시각화 함수
+# 시각화 함수 (에러 수정 포함)
 # -----------------------------
 def draw_graph(graph, highlight_edges=None, title="그래프"):
     pos = nx.spring_layout(graph, seed=42)
     weights = nx.get_edge_attributes(graph, "weight")
     plt.figure(figsize=(6, 4))
-    edge_colors = []
 
+    edge_colors = []
     for edge in graph.edges():
-        if highlight_edges and edge in highlight_edges or (edge[1], edge[0]) in highlight_edges:
+        if highlight_edges is not None and (edge in highlight_edges or (edge[1], edge[0]) in highlight_edges):
             edge_colors.append("red")
         else:
             edge_colors.append("gray")
