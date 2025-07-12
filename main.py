@@ -5,32 +5,57 @@ import numpy as np
 import pandas as pd
 
 # -----------------------------
-# UI 구성
+# 기본 설정
 # -----------------------------
-st.title("Prim vs Kruskal 최소 신장 트리 시각화")
+st.set_page_config(page_title="그래프 알고리즘 시각화", layout="centered")
+st.title("📊 그래프 알고리즘 시각화 도구")
 
-node_count = st.number_input("노드 수 입력 (2 이상)", min_value=2, max_value=20, value=4, step=1)
+# -----------------------------
+# 입력: 노드 수 및 가중치 행렬
+# -----------------------------
+node_count = st.number_input("노드 수 입력", min_value=2, max_value=20, value=4)
 
-st.markdown("#### 간선 가중치 행렬 입력")
-symmetric_toggle = st.checkbox("양방향 간선 가중치 자동 대칭 처리", value=True)
+symmetric_toggle = st.checkbox("🔁 양방향 간선 가중치 자동 대칭 처리", value=True)
 
 if symmetric_toggle:
-    st.caption("🔁 상삼각형만 입력하세요 (i < j). 간선은 양방향이며 가중치는 자동으로 대칭 처리됩니다.")
+    st.caption("상삼각형만 입력하세요 (i < j). 간선은 양방향이며 자동으로 대칭 처리됩니다.")
 else:
-    st.caption("🔁 상하삼각 모두 직접 입력하세요. 간선은 양방향이지만 가중치는 별도로 설정됩니다.")
+    st.caption("모든 셀을 직접 입력하세요. 간선은 양방향이지만 가중치는 별도로 설정됩니다.")
 
-# 기본 빈 행렬 생성
 default_matrix = [["" for _ in range(node_count)] for _ in range(node_count)]
 df = pd.DataFrame(default_matrix, columns=[f"N{i}" for i in range(node_count)], index=[f"N{i}" for i in range(node_count)])
 weight_matrix = st.data_editor(df, num_rows="fixed")
 
 # -----------------------------
-# 대칭 가중치 처리 및 그래프 생성
+# 알고리즘 선택
 # -----------------------------
+st.markdown("### 📌 알고리즘 선택")
+algorithm = st.selectbox(
+    "사용할 알고리즘을 선택하세요:",
+    [
+        "🛠️ 확장형 연결 방식 (Prim)",
+        "🪢 묶음 연결 방식 (Kruskal)",
+        "🚶 최단 경로 찾기 (Dijkstra)"
+    ]
+)
+
+if "Dijkstra" in algorithm:
+    start_node = st.selectbox("🚩 시작 노드를 선택하세요", [f"N{i}" for i in range(node_count)])
+    start_index = int(start_node[1:])
+
+# -----------------------------
+# 그래프 구성
+# -----------------------------
+def make_symmetric_matrix(matrix):
+    n = len(matrix)
+    for i in range(n):
+        for j in range(i + 1, n):
+            matrix[j][i] = matrix[i][j]
+    return matrix
+
 def parse_matrix(matrix, symmetric=True):
     G = nx.Graph()
     n = len(matrix)
-
     for i in range(n):
         G.add_node(i)
         for j in range(n):
@@ -42,77 +67,82 @@ def parse_matrix(matrix, symmetric=True):
             try:
                 weight = float(val)
                 if symmetric and G.has_edge(j, i):
-                    continue  # 이미 추가된 대칭 간선
+                    continue
                 G.add_edge(i, j, weight=weight)
             except ValueError:
                 continue
     return G
 
-def make_symmetric_matrix(matrix):
-    n = len(matrix)
-    for i in range(n):
-        for j in range(i + 1, n):
-            matrix[j][i] = matrix[i][j]
-    return matrix
-
-# 입력 처리
-user_matrix = weight_matrix.values.tolist()
+matrix_values = weight_matrix.values.tolist()
 if symmetric_toggle:
-    sym_matrix = make_symmetric_matrix(user_matrix)
-else:
-    sym_matrix = user_matrix
+    matrix_values = make_symmetric_matrix(matrix_values)
 
-G = parse_matrix(sym_matrix, symmetric=symmetric_toggle)
+G = parse_matrix(matrix_values, symmetric=symmetric_toggle)
 
 # -----------------------------
-# 시각화 함수
+# 그래프 시각화 함수
 # -----------------------------
-def draw_graph(graph, title="그래프"):
+def draw_graph(graph, highlight_edges=None, title="그래프"):
     pos = nx.spring_layout(graph, seed=42)
-    weights = nx.get_edge_attributes(graph, 'weight')
+    weights = nx.get_edge_attributes(graph, "weight")
     plt.figure(figsize=(6, 4))
-    nx.draw(graph, pos, with_labels=True, node_color="skyblue", edge_color="gray", node_size=600)
+    edge_colors = []
+
+    for edge in graph.edges():
+        if highlight_edges and edge in highlight_edges or (edge[1], edge[0]) in highlight_edges:
+            edge_colors.append("red")
+        else:
+            edge_colors.append("gray")
+
+    nx.draw(graph, pos, with_labels=True, node_color="skyblue", edge_color=edge_colors, node_size=600, width=2)
     nx.draw_networkx_edge_labels(graph, pos, edge_labels=weights)
     st.pyplot(plt)
 
 # -----------------------------
-# 전체 그래프 먼저 시각화
+# 전체 그래프 출력
 # -----------------------------
-st.subheader("🧩 전체 입력 그래프")
+st.markdown("### 🧩 전체 입력 그래프")
 if G.number_of_edges() == 0:
     st.info("간선을 추가하면 전체 그래프가 여기에 표시됩니다.")
 else:
-    draw_graph(G, title="입력 그래프")
-    st.write("총 노드 수:", G.number_of_nodes())
-    st.write("총 간선 수:", G.number_of_edges())
+    draw_graph(G, title="전체 그래프")
+    st.write("노드 수:", G.number_of_nodes())
+    st.write("간선 수:", G.number_of_edges())
     st.write("간선 목록:", list(G.edges(data=True)))
 
 # -----------------------------
-# 알고리즘 구현
+# 알고리즘 실행
 # -----------------------------
-def run_prim(graph):
-    return nx.minimum_spanning_tree(graph, algorithm="prim")
-
-def run_kruskal(graph):
-    return nx.minimum_spanning_tree(graph, algorithm="kruskal")
-
-# -----------------------------
-# 실행 버튼 및 결과 출력
-# -----------------------------
-if st.button("Prim & Kruskal 알고리즘 실행"):
+if st.button("🚀 알고리즘 실행"):
     if G.number_of_edges() == 0:
-        st.warning("⚠️ 그래프에 유효한 간선이 없습니다.")
+        st.warning("⚠️ 간선이 없습니다.")
     else:
-        st.subheader("🔷 Prim 알고리즘 결과")
-        prim_mst = run_prim(G)
-        draw_graph(prim_mst, title="Prim MST")
-        prim_weight = prim_mst.size(weight="weight")
-        st.write("총 가중치:", prim_weight)
-        st.write("간선 목록:", list(prim_mst.edges(data=True)))
+        if "Prim" in algorithm:
+            st.subheader("🛠️ 확장형 연결 방식 (Prim)")
+            mst = nx.minimum_spanning_tree(G, algorithm="prim")
+            draw_graph(mst, highlight_edges=mst.edges())
+            st.write("총 가중치:", mst.size(weight="weight"))
+            st.write("연결된 간선:", list(mst.edges(data=True)))
 
-        st.subheader("🔶 Kruskal 알고리즘 결과")
-        kruskal_mst = run_kruskal(G)
-        draw_graph(kruskal_mst, title="Kruskal MST")
-        kruskal_weight = kruskal_mst.size(weight="weight")
-        st.write("총 가중치:", kruskal_weight)
-        st.write("간선 목록:", list(kruskal_mst.edges(data=True)))
+        elif "Kruskal" in algorithm:
+            st.subheader("🪢 묶음 연결 방식 (Kruskal)")
+            mst = nx.minimum_spanning_tree(G, algorithm="kruskal")
+            draw_graph(mst, highlight_edges=mst.edges())
+            st.write("총 가중치:", mst.size(weight="weight"))
+            st.write("연결된 간선:", list(mst.edges(data=True)))
+
+        elif "Dijkstra" in algorithm:
+            st.subheader("🚶 최단 경로 찾기 (Dijkstra)")
+            try:
+                lengths, paths = nx.single_source_dijkstra(G, source=start_index)
+                for target in sorted(paths.keys()):
+                    if target == start_index:
+                        continue
+                    path_nodes = paths[target]
+                    path_edges = list(zip(path_nodes[:-1], path_nodes[1:]))
+                    st.markdown(f"**경로 {start_node} → N{target}**")
+                    st.write("총 거리:", lengths[target])
+                    st.write("경로:", " → ".join([f"N{n}" for n in path_nodes]))
+                    draw_graph(G, highlight_edges=path_edges)
+            except nx.NetworkXNoPath:
+                st.warning("🚫 해당 노드까지의 경로가 존재하지 않습니다.")
