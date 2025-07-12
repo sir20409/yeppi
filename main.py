@@ -46,7 +46,7 @@ if "TSP" in algorithm:
     start_index = int(start_node[1:])
 
 # -----------------------------
-# 그래프 구성 함수
+# 그래프 생성 함수
 # -----------------------------
 def make_symmetric_matrix(matrix):
     n = len(matrix)
@@ -76,12 +76,10 @@ def parse_matrix(matrix, symmetric=True):
     return G
 
 def is_graph_valid_for_tsp(G):
+    if G.number_of_nodes() < 2 or G.number_of_edges() < 1:
+        return False
     try:
-        return (
-            G.number_of_nodes() >= 2 and
-            G.number_of_edges() >= 1 and
-            nx.is_connected(G)
-        )
+        return nx.is_connected(G)
     except:
         return False
 
@@ -128,8 +126,8 @@ else:
 if st.button("🚀 알고리즘 실행"):
     if G.number_of_edges() == 0:
         st.warning("⚠️ 간선이 없습니다.")
-    elif not nx.is_connected(G):
-        st.warning("⚠️ 그래프가 연결되어 있지 않습니다. 모든 노드가 연결되도록 간선을 입력하세요.")
+    elif not is_graph_valid_for_tsp(G):
+        st.warning("⚠️ 그래프가 연결되어 있지 않거나 노드 수가 부족합니다.")
     else:
         if "Prim" in algorithm:
             st.subheader("🛠️ 확장형 연결 방식 (Prim)")
@@ -147,15 +145,12 @@ if st.button("🚀 알고리즘 실행"):
 
         elif "TSP" in algorithm:
             st.subheader("🧭 모든 노드 순회 (TSP)")
-            if not is_graph_valid_for_tsp(G):
-                st.warning("⚠️ 최소 2개 이상의 노드가 연결되어 있어야 TSP를 계산할 수 있습니다.")
-            else:
-                try:
-                    path = traveling_salesman_problem(G, cycle=True, weight="weight", nodes=[start_index])
-                    tsp_edges = list(zip(path[:-1], path[1:]))
-                    total_cost = sum(G[u][v]['weight'] for u, v in tsp_edges)
-                    st.write("방문 순서:", " → ".join([f"N{n}" for n in path]))
-                    st.write("총 거리:", total_cost)
-                    draw_graph(G, highlight_edges=tsp_edges)
-                except Exception as e:
-                    st.error(f"TSP 계산 중 오류 발생: {e}")
+            try:
+                path = traveling_salesman_problem(G, cycle=True, weight="weight", nodes=[start_index])
+                tsp_edges = list(zip(path[:-1], path[1:]))
+                total_cost = sum(G[u][v]['weight'] for u, v in tsp_edges)
+                st.write("방문 순서:", " → ".join([f"N{n}" for n in path]))
+                st.write("총 거리:", total_cost)
+                draw_graph(G, highlight_edges=tsp_edges)
+            except Exception as e:
+                st.error(f"TSP 계산 중 오류 발생: {e}")
