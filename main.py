@@ -38,26 +38,24 @@ def parse_matrix(matrix, symmetric=True):
                 continue
             val = matrix[i][j]
             if val == "" or val is None:
-                continue  # 간선 없음
+                continue
             try:
                 weight = float(val)
-                # 만약 이미 추가된 간선이라면 무시 (무방향 중복 방지)
                 if symmetric and G.has_edge(j, i):
-                    continue
+                    continue  # 이미 추가된 대칭 간선
                 G.add_edge(i, j, weight=weight)
             except ValueError:
                 continue
     return G
 
 def make_symmetric_matrix(matrix):
-    # 상삼각 값만 보고 하삼각을 자동 채워서 대칭 행렬로 만듦
     n = len(matrix)
     for i in range(n):
         for j in range(i + 1, n):
             matrix[j][i] = matrix[i][j]
     return matrix
 
-# 대칭 처리 여부에 따라 행렬 처리
+# 입력 처리
 user_matrix = weight_matrix.values.tolist()
 if symmetric_toggle:
     sym_matrix = make_symmetric_matrix(user_matrix)
@@ -67,14 +65,8 @@ else:
 G = parse_matrix(sym_matrix, symmetric=symmetric_toggle)
 
 # -----------------------------
-# 알고리즘 구현
+# 시각화 함수
 # -----------------------------
-def run_prim(graph):
-    return nx.minimum_spanning_tree(graph, algorithm="prim")
-
-def run_kruskal(graph):
-    return nx.minimum_spanning_tree(graph, algorithm="kruskal")
-
 def draw_graph(graph, title="그래프"):
     pos = nx.spring_layout(graph, seed=42)
     weights = nx.get_edge_attributes(graph, 'weight')
@@ -82,6 +74,27 @@ def draw_graph(graph, title="그래프"):
     nx.draw(graph, pos, with_labels=True, node_color="skyblue", edge_color="gray", node_size=600)
     nx.draw_networkx_edge_labels(graph, pos, edge_labels=weights)
     st.pyplot(plt)
+
+# -----------------------------
+# 전체 그래프 먼저 시각화
+# -----------------------------
+st.subheader("🧩 전체 입력 그래프")
+if G.number_of_edges() == 0:
+    st.info("간선을 추가하면 전체 그래프가 여기에 표시됩니다.")
+else:
+    draw_graph(G, title="입력 그래프")
+    st.write("총 노드 수:", G.number_of_nodes())
+    st.write("총 간선 수:", G.number_of_edges())
+    st.write("간선 목록:", list(G.edges(data=True)))
+
+# -----------------------------
+# 알고리즘 구현
+# -----------------------------
+def run_prim(graph):
+    return nx.minimum_spanning_tree(graph, algorithm="prim")
+
+def run_kruskal(graph):
+    return nx.minimum_spanning_tree(graph, algorithm="kruskal")
 
 # -----------------------------
 # 실행 버튼 및 결과 출력
