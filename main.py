@@ -12,8 +12,12 @@ st.title("Prim vs Kruskal 최소 신장 트리 시각화")
 node_count = st.number_input("노드 수 입력 (2 이상)", min_value=2, max_value=20, value=4, step=1)
 
 st.markdown("#### 간선 가중치 행렬 입력")
-st.caption("🔁 위쪽 삼각형만 입력하세요 (i < j). 아래쪽은 무시됩니다. "
-           "빈 칸은 간선 없음, 숫자 0도 유효한 가중치입니다. 간선은 양방향이고 동일 가중치입니다.")
+symmetric_toggle = st.checkbox("양방향 간선 가중치 자동 대칭 처리", value=True)
+
+if symmetric_toggle:
+    st.caption("🔁 상삼각형만 입력하세요 (i < j). 간선은 양방향이며 가중치는 자동으로 대칭 처리됩니다.")
+else:
+    st.caption("🔁 상하삼각 모두 직접 입력하세요. 간선은 양방향이지만 가중치는 별도로 설정됩니다.")
 
 # 기본 빈 행렬 생성
 default_matrix = [["" for _ in range(node_count)] for _ in range(node_count)]
@@ -21,24 +25,46 @@ df = pd.DataFrame(default_matrix, columns=[f"N{i}" for i in range(node_count)], 
 weight_matrix = st.data_editor(df, num_rows="fixed")
 
 # -----------------------------
-# 입력 처리 및 그래프 생성
+# 대칭 가중치 처리 및 그래프 생성
 # -----------------------------
-def parse_matrix(matrix):
+def parse_matrix(matrix, symmetric=True):
     G = nx.Graph()
-    for i in range(len(matrix)):
+    n = len(matrix)
+
+    for i in range(n):
         G.add_node(i)
-        for j in range(i + 1, len(matrix)):
+        for j in range(n):
+            if i == j:
+                continue
             val = matrix[i][j]
             if val == "" or val is None:
                 continue  # 간선 없음
             try:
                 weight = float(val)
-                G.add_edge(i, j, weight=weight)  # 양방향, 동일 가중치
+                # 만약 이미 추가된 간선이라면 무시 (무방향 중복 방지)
+                if symmetric and G.has_edge(j, i):
+                    continue
+                G.add_edge(i, j, weight=weight)
             except ValueError:
                 continue
     return G
 
-G = parse_matrix(weight_matrix.values.tolist())
+def make_symmetric_matrix(matrix):
+    # 상삼각 값만 보고 하삼각을 자동 채워서 대칭 행렬로 만듦
+    n = len(matrix)
+    for i in range(n):
+        for j in range(i + 1, n):
+            matrix[j][i] = matrix[i][j]
+    return matrix
+
+# 대칭 처리 여부에 따라 행렬 처리
+user_matrix = weight_matrix.values.tolist()
+if symmetric_toggle:
+    sym_matrix = make_symmetric_matrix(user_matrix)
+else:
+    sym_matrix = user_matrix
+
+G = parse_matrix(sym_matrix, symmetric=symmetric_toggle)
 
 # -----------------------------
 # 알고리즘 구현
