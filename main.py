@@ -11,7 +11,11 @@ st.title("Prim vs Kruskal 최소 신장 트리 시각화")
 
 node_count = st.number_input("노드 수 입력 (2 이상)", min_value=2, max_value=20, value=4, step=1)
 
-st.markdown("#### 간선 가중치 행렬 입력 (빈 칸은 간선 없음, 0도 유효한 가중치로 간주)")
+st.markdown("#### 간선 가중치 행렬 입력")
+st.caption("🔁 위쪽 삼각형만 입력하세요 (i < j). 아래쪽은 무시됩니다. "
+           "빈 칸은 간선 없음, 숫자 0도 유효한 가중치입니다. 간선은 양방향이고 동일 가중치입니다.")
+
+# 기본 빈 행렬 생성
 default_matrix = [["" for _ in range(node_count)] for _ in range(node_count)]
 df = pd.DataFrame(default_matrix, columns=[f"N{i}" for i in range(node_count)], index=[f"N{i}" for i in range(node_count)])
 weight_matrix = st.data_editor(df, num_rows="fixed")
@@ -29,7 +33,7 @@ def parse_matrix(matrix):
                 continue  # 간선 없음
             try:
                 weight = float(val)
-                G.add_edge(i, j, weight=weight)
+                G.add_edge(i, j, weight=weight)  # 양방향, 동일 가중치
             except ValueError:
                 continue
     return G
@@ -40,12 +44,10 @@ G = parse_matrix(weight_matrix.values.tolist())
 # 알고리즘 구현
 # -----------------------------
 def run_prim(graph):
-    mst = nx.minimum_spanning_tree(graph, algorithm="prim")
-    return mst
+    return nx.minimum_spanning_tree(graph, algorithm="prim")
 
 def run_kruskal(graph):
-    mst = nx.minimum_spanning_tree(graph, algorithm="kruskal")
-    return mst
+    return nx.minimum_spanning_tree(graph, algorithm="kruskal")
 
 def draw_graph(graph, title="그래프"):
     pos = nx.spring_layout(graph, seed=42)
@@ -60,7 +62,7 @@ def draw_graph(graph, title="그래프"):
 # -----------------------------
 if st.button("Prim & Kruskal 알고리즘 실행"):
     if G.number_of_edges() == 0:
-        st.warning("그래프에 간선이 없습니다.")
+        st.warning("⚠️ 그래프에 유효한 간선이 없습니다.")
     else:
         st.subheader("🔷 Prim 알고리즘 결과")
         prim_mst = run_prim(G)
